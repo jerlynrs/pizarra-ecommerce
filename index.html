@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pizarra: tutor de matemáticas con IA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Kalam:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F6F8FB; --grid:#DFE7F2; --surface:#FFFFFF; --line:#C9D5E6;
+  --ink:#1C2B4A; --ink-soft:#4F5F7E; --pencil:#F2B705; --pencil-soft:#FCEBB0;
+  --red:#C2413A; --green:#1F7F53; --on-ink:#FFFFFF;
+  --hand:"Kalam","Comic Sans MS","Segoe Print",cursive;
+  --body:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  color-scheme:light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#1E2A25; --grid:#283731; --surface:#25332D; --line:#3B4C44;
+    --ink:#EDF2EA; --ink-soft:#B4C1B7; --pencil:#F5CF4A; --pencil-soft:#4A4425;
+    --red:#F0897F; --green:#82D4A4; --on-ink:#1E2A25;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#1E2A25; --grid:#283731; --surface:#25332D; --line:#3B4C44;
+  --ink:#EDF2EA; --ink-soft:#B4C1B7; --pencil:#F5CF4A; --pencil-soft:#4A4425;
+  --red:#F0897F; --green:#82D4A4; --on-ink:#1E2A25;
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{
+  margin:0; font-family:var(--body); color:var(--ink); line-height:1.55; font-size:17px;
+  background-color:var(--paper);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:26px 26px;
+}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+a{color:inherit}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--pencil);outline-offset:2px}
+.wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+.hand{font-family:var(--hand)}
+
+/* Demo banner + header */
+.demo{background:var(--ink);color:var(--on-ink);font-size:14px;text-align:center;padding:6px 12px}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:2px solid var(--ink)}
+.top .wrap{display:flex;align-items:center;gap:18px;height:64px}
+.logo{font-family:var(--hand);font-weight:700;font-size:30px;text-decoration:none;line-height:1;position:relative}
+.logo::after{content:"";position:absolute;left:-2px;right:-4px;bottom:2px;height:9px;background:var(--pencil);opacity:.55;z-index:-1;transform:rotate(-1.5deg)}
+nav.main{display:flex;gap:4px;margin-left:auto;align-items:center}
+nav.main a{text-decoration:none;padding:8px 12px;border-radius:6px;font-weight:700;font-size:15px}
+nav.main a[aria-current="page"]{background:var(--pencil-soft)}
+.cart-btn{display:inline-flex;align-items:center;gap:8px;border:2px solid var(--ink);background:var(--surface);padding:6px 12px;border-radius:999px;font-weight:700;cursor:pointer;text-decoration:none}
+.cart-count{background:var(--ink);color:var(--on-ink);border-radius:999px;min-width:22px;height:22px;display:inline-grid;place-items:center;font-size:13px;padding:0 6px}
+@media (max-width:720px){
+  nav.main a.opt{display:none}
+  .top .wrap{gap:10px}
+}
+
+main{padding:40px 0 70px;min-height:calc(100vh - 170px)}
+.view{display:none}
+.view.active{display:block}
+h1,h2,h3{line-height:1.15;margin:0 0 .5em}
+h1{font-size:clamp(34px,5.4vw,58px);letter-spacing:-.02em}
+h2{font-size:clamp(26px,3.4vw,36px);letter-spacing:-.01em}
+h3{font-size:20px}
+p{margin:0 0 1em;max-width:62ch}
+.lead{font-size:19px;color:var(--ink-soft)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:2px solid var(--ink);border-radius:8px;padding:12px 20px;font-weight:700;cursor:pointer;text-decoration:none;background:var(--surface);transition:transform .12s}
+.btn:active{transform:translateY(1px)}
+.btn.primary{background:var(--ink);color:var(--on-ink)}
+.btn.small{padding:8px 14px;font-size:15px}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.muted{color:var(--ink-soft)}
+
+/* Hero */
+.hero{display:grid;grid-template-columns:1.05fr .95fr;gap:48px;align-items:center}
+@media (max-width:860px){.hero{grid-template-columns:1fr}}
+.sheet{background:var(--surface);border:2px solid var(--ink);border-radius:4px 4px 18px 4px;padding:28px 28px 30px 64px;position:relative;
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px);background-size:100% 40px;background-position:0 22px;box-shadow:8px 8px 0 var(--ink)}
+.sheet::before{content:"";position:absolute;top:0;bottom:0;left:44px;width:2px;background:var(--red);opacity:.55}
+.sheet .line{font-family:var(--hand);font-size:clamp(26px,3.4vw,36px);line-height:40px;height:40px;white-space:nowrap}
+.sheet .note{font-family:var(--hand);color:var(--red);font-size:19px;line-height:1.3;margin:6px 0 4px;transform:rotate(-2deg);max-width:none}
+.sheet .final{display:inline-block;padding:0 6px;background:linear-gradient(transparent 55%,var(--pencil-soft) 55%)}
+.sheet .ok{color:var(--green)}
+@media (prefers-reduced-motion:no-preference){
+  .sheet .line,.sheet .note{opacity:0;animation:write .55s ease-out forwards}
+  .sheet > :nth-child(1){animation-delay:.2s}.sheet > :nth-child(2){animation-delay:.9s}
+  .sheet > :nth-child(3){animation-delay:1.6s}.sheet > :nth-child(4){animation-delay:2.2s}
+  .sheet > :nth-child(5){animation-delay:2.9s}
+  @keyframes write{from{opacity:0;clip-path:inset(0 100% 0 0)}to{opacity:1;clip-path:inset(0 0 0 0)}}
+}
+
+.how{margin-top:72px;display:grid;grid-template-columns:repeat(3,1fr);gap:28px}
+@media (max-width:760px){.how{grid-template-columns:1fr}}
+.how-step{border-top:2px solid var(--ink);padding-top:14px}
+.how-step .n{font-family:var(--hand);font-size:34px;line-height:1;color:var(--red)}
+
+/* Planes */
+.toggle{display:inline-flex;border:2px solid var(--ink);border-radius:999px;overflow:hidden;margin:8px 0 28px}
+.toggle button{border:0;background:transparent;padding:8px 18px;font-weight:700;cursor:pointer}
+.toggle button[aria-pressed="true"]{background:var(--ink);color:var(--on-ink)}
+.plans{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;align-items:stretch}
+@media (max-width:980px){.plans{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:560px){.plans{grid-template-columns:1fr}}
+.plan{background:var(--surface);border:2px solid var(--line);border-radius:10px;padding:22px;display:flex;flex-direction:column;gap:10px}
+.plan.featured{border-color:var(--ink);box-shadow:6px 6px 0 var(--pencil)}
+.plan .tag{font-family:var(--hand);color:var(--red);font-size:18px;line-height:1}
+.price{font-size:34px;font-weight:700;line-height:1.1}
+.price small{font-size:15px;font-weight:400;color:var(--ink-soft)}
+.plan ul{margin:4px 0 8px;padding-left:20px;font-size:15.5px}
+.plan ul li{margin-bottom:4px}
+.plan .btn{margin-top:auto}
+.addons{margin-top:48px}
+.addon-list{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+@media (max-width:860px){.addon-list{grid-template-columns:1fr}}
+.addon{display:flex;gap:14px;align-items:flex-start;background:var(--surface);border:2px dashed var(--line);border-radius:10px;padding:16px}
+.addon .sym{font-family:var(--hand);font-size:30px;line-height:1;min-width:38px;text-align:center}
+.addon h3{font-size:17px;margin-bottom:2px}
+.addon p{font-size:15px;margin-bottom:8px}
+
+/* Carrito y pago */
+.two{display:grid;grid-template-columns:1.4fr 1fr;gap:28px;align-items:start}
+@media (max-width:860px){.two{grid-template-columns:1fr}}
+.panel{background:var(--surface);border:2px solid var(--ink);border-radius:10px;padding:22px}
+.item{display:flex;justify-content:space-between;gap:12px;padding:14px 0;border-bottom:1px solid var(--line)}
+.item:last-child{border-bottom:0}
+.item .x{background:none;border:0;color:var(--red);cursor:pointer;font-weight:700;padding:0;text-decoration:underline}
+.sum-row{display:flex;justify-content:space-between;padding:6px 0}
+.sum-row.total{border-top:2px solid var(--ink);margin-top:8px;padding-top:12px;font-size:20px;font-weight:700}
+.discount{color:var(--green)}
+.empty{text-align:center;padding:40px 10px}
+.empty .hand{font-size:28px;display:block;margin-bottom:6px}
+label{display:block;font-weight:700;font-size:15px;margin:12px 0 4px}
+input[type=text],input[type=email]{width:100%;padding:11px 12px;border:2px solid var(--line);border-radius:8px;background:var(--paper)}
+input:focus{border-color:var(--ink)}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.methods{display:grid;gap:8px;margin-top:6px}
+.method{display:flex;gap:10px;align-items:center;border:2px solid var(--line);border-radius:8px;padding:10px 12px;cursor:pointer;font-weight:400}
+.method:has(input:checked){border-color:var(--ink);background:var(--pencil-soft)}
+.err{color:var(--red);font-size:14.5px;margin-top:6px;min-height:1em}
+.coupon{display:flex;gap:8px;margin-top:12px}
+.coupon input{flex:1}
+
+/* Confirmación */
+.stamp{display:inline-block;font-family:var(--hand);font-size:28px;color:var(--green);border:3px solid var(--green);border-radius:8px;padding:2px 14px;transform:rotate(-4deg);margin-bottom:18px}
+
+/* Panel del estudiante */
+.dash{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+@media (max-width:860px){.dash{grid-template-columns:1fr}}
+.rings{display:flex;gap:22px;flex-wrap:wrap}
+.ring{text-align:center;font-weight:700;font-size:15px}
+.ring svg{display:block;margin:0 auto 6px}
+.ask{display:flex;gap:10px;margin-top:6px}
+.ask input{flex:1}
+.cam{width:52px;height:48px;border:2px solid var(--ink);border-radius:8px;background:var(--pencil);cursor:pointer;display:grid;place-items:center;color:#1C2B4A}
+.path{display:grid;gap:10px;margin-top:6px}
+.path a{display:flex;justify-content:space-between;align-items:center;gap:12px;border:2px solid var(--line);border-radius:8px;padding:12px 14px;text-decoration:none;background:var(--paper)}
+.path a:hover{border-color:var(--ink)}
+.path .why{font-size:14px;color:var(--ink-soft)}
+
+/* Tutor */
+.tutor{display:grid;grid-template-columns:1fr 1.1fr;gap:24px;align-items:start}
+@media (max-width:860px){.tutor{grid-template-columns:1fr}}
+.work{min-height:300px}
+.work .line,.work .note{opacity:1;animation:none}
+.chat{display:flex;flex-direction:column;gap:12px;max-height:520px;overflow-y:auto;padding-right:4px}
+.msg{max-width:88%;padding:12px 14px;border-radius:12px;font-size:16px}
+.msg.ai{background:var(--paper);border:2px solid var(--line);border-bottom-left-radius:3px}
+.msg.me{align-self:flex-end;background:var(--ink);color:var(--on-ink);border-bottom-right-radius:3px}
+.msg.hint{border-color:var(--red)}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.chip{border:2px solid var(--ink);background:var(--surface);border-radius:999px;padding:8px 14px;cursor:pointer;font-weight:700;font-size:15px}
+.chip:hover{background:var(--pencil-soft)}
+.chip.alt{border-style:dashed;font-weight:400}
+
+/* Logro */
+.reward{text-align:center;max-width:620px;margin:0 auto}
+.reward .big{font-family:var(--hand);font-size:clamp(44px,7vw,72px);line-height:1.05;margin-bottom:10px}
+.rules{text-align:left;margin:24px auto;max-width:460px}
+.rules li{margin-bottom:8px}
+
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--on-ink);padding:12px 18px;border-radius:8px;font-weight:700;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:20;max-width:90vw}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+footer{border-top:2px solid var(--ink);background:var(--surface);padding:20px 0;font-size:14.5px;color:var(--ink-soft)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="demo">Prototipo académico para ISO923, Implementación de E-commerce. Los pagos son simulados.</div>
+<header class="top">
+  <div class="wrap">
+    <a class="logo" href="#inicio">Pizarra</a>
+    <nav class="main" aria-label="Principal">
+      <a href="#planes" data-nav="planes">Planes</a>
+      <a href="#panel" data-nav="panel" class="opt">Mi panel</a>
+      <a href="#tutor" data-nav="tutor" class="opt">Tutor</a>
+      <a href="#carrito" class="cart-btn" data-nav="carrito">Carrito <span class="cart-count" id="cartCount">0</span></a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+<!-- INICIO -->
+<section class="view" id="v-inicio">
+  <div class="hero">
+    <div>
+      <h1>Matemáticas paso a paso, sin que te den la respuesta.</h1>
+      <p class="lead">Pizarra es un tutor con inteligencia artificial que te guía con preguntas, como lo haría un buen maestro. Escanea tu ejercicio y resuélvelo tú, con ayuda en cada paso.</p>
+      <div class="row">
+        <a class="btn primary" href="#planes">Ver planes</a>
+        <a class="btn" href="#tutor" data-action="demo">Probar el tutor gratis</a>
+      </div>
+    </div>
+    <div class="sheet" aria-label="Ejemplo de un ejercicio resuelto paso a paso">
+      <div class="line">2x + 5 = 13</div>
+      <p class="note">¿Qué haces con el +5?</p>
+      <div class="line">2x = 13 − 5</div>
+      <div class="line">2x = 8</div>
+      <div class="line"><span class="final">x = 4</span> <span class="ok">✓</span></div>
+    </div>
+  </div>
+
+  <div class="how">
+    <div class="how-step"><div class="n">1</div><h3>Escanea o escribe</h3><p>Toma una foto del ejercicio de tu cuaderno o escríbelo con el teclado matemático.</p></div>
+    <div class="how-step"><div class="n">2</div><h3>Resuélvelo con guía</h3><p>El tutor te pregunta qué harías en cada paso. Si te trabas, te lo explica de otra forma.</p></div>
+    <div class="how-step"><div class="n">3</div><h3>Practica y mide tu avance</h3><p>Recibe ejercicios parecidos y un reporte de lo que ya dominas. Tus padres también lo ven.</p></div>
+  </div>
+</section>
+
+<!-- PLANES (catálogo) -->
+<section class="view" id="v-planes">
+  <h2>Elige tu plan</h2>
+  <p class="muted">Precios en pesos dominicanos. Puedes cancelar cuando quieras.</p>
+  <div class="toggle" role="group" aria-label="Periodo de pago">
+    <button type="button" data-period="mensual" aria-pressed="true">Mensual</button>
+    <button type="button" data-period="anual" aria-pressed="false">Anual (2 meses gratis)</button>
+  </div>
+  <div class="plans" id="plans"></div>
+
+  <div class="addons">
+    <h2>Complementos</h2>
+    <p class="muted">Pídelos junto con tu plan Estudiante o Familia.</p>
+    <div class="addon-list" id="addons"></div>
+  </div>
+</section>
+
+<!-- CARRITO -->
+<section class="view" id="v-carrito">
+  <h2>Tu carrito</h2>
+  <div class="two">
+    <div class="panel" id="cartItems"></div>
+    <div class="panel" id="cartSummary"></div>
+  </div>
+</section>
+
+<!-- PAGO -->
+<section class="view" id="v-pago">
+  <h2>Pago</h2>
+  <div class="two">
+    <form class="panel" id="payForm" novalidate>
+      <label for="fName">Nombre completo</label>
+      <input type="text" id="fName" autocomplete="name" required>
+      <label for="fEmail">Correo electrónico</label>
+      <input type="email" id="fEmail" autocomplete="email" required>
+
+      <label id="mLabel">Método de pago</label>
+      <div class="methods" role="radiogroup" aria-labelledby="mLabel">
+        <label class="method"><input type="radio" name="method" value="tarjeta" checked> Tarjeta de crédito o débito</label>
+        <label class="method"><input type="radio" name="method" value="paypal"> PayPal</label>
+        <label class="method"><input type="radio" name="method" value="transferencia"> Transferencia bancaria</label>
+      </div>
+
+      <div id="cardFields">
+        <label for="fCard">Número de tarjeta</label>
+        <input type="text" id="fCard" inputmode="numeric" placeholder="4242 4242 4242 4242" autocomplete="off">
+        <div class="field-row">
+          <div><label for="fExp">Vence</label><input type="text" id="fExp" placeholder="MM/AA" autocomplete="off"></div>
+          <div><label for="fCvc">CVC</label><input type="text" id="fCvc" inputmode="numeric" placeholder="123" autocomplete="off"></div>
+        </div>
+        <p class="muted" style="font-size:14px;margin-top:8px">Prototipo: usa la tarjeta de prueba 4242 4242 4242 4242. No se cobra nada.</p>
+      </div>
+      <p class="err" id="payErr" role="alert"></p>
+      <button class="btn primary" type="submit" style="width:100%;margin-top:6px" id="payBtn">Pagar</button>
+    </form>
+    <div class="panel" id="paySummary"></div>
+  </div>
+</section>
+
+<!-- CONFIRMACIÓN -->
+<section class="view" id="v-confirmacion">
+  <div class="panel" style="max-width:640px;margin:0 auto">
+    <div class="stamp">¡Pagado!</div>
+    <h2 id="cTitle">Gracias por tu compra</h2>
+    <p id="cText"></p>
+    <div id="cItems"></div>
+    <div class="row" style="margin-top:18px">
+      <a class="btn primary" href="#panel">Ir a mi panel</a>
+      <a class="btn" href="#tutor">Resolver mi primer ejercicio</a>
+    </div>
+  </div>
+</section>
+
+<!-- PANEL DEL ESTUDIANTE -->
+<section class="view" id="v-panel">
+  <h2 id="hello">¡Hola! ¿Qué concepto dominaremos hoy?</h2>
+  <p class="muted" id="planLine"></p>
+  <div class="dash">
+    <div class="panel">
+      <h3>Tengo un ejercicio</h3>
+      <p class="muted" style="font-size:15px">Escribe una ecuación del tipo ax + b = c o escanéala.</p>
+      <form class="ask" id="askForm">
+        <label class="sr" for="askInput">Ecuación</label>
+        <input type="text" id="askInput" placeholder="Ej. 3x + 4 = 19">
+        <button type="button" class="cam" id="camBtn" aria-label="Escanear con la cámara">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+        </button>
+        <button class="btn primary small" type="submit">Resolver</button>
+      </form>
+      <p class="err" id="askErr" role="alert"></p>
+      <h3 style="margin-top:22px">Tu dominio por área</h3>
+      <div class="rings" id="rings"></div>
+    </div>
+    <div class="panel">
+      <h3>Tu ruta sugerida</h3>
+      <p class="muted" style="font-size:15px">Basada en los errores de tus últimas sesiones.</p>
+      <div class="path">
+        <a href="#tutor" data-eq="3,4,19"><span><strong>Despejar la x</strong><br><span class="why">Te confundiste con el signo al pasar términos</span></span><span class="hand" style="font-size:22px">3x + 4 = 19</span></a>
+        <a href="#tutor" data-eq="5,-10,25"><span><strong>Números negativos</strong><br><span class="why">Repaso corto, unos 5 minutos</span></span><span class="hand" style="font-size:22px">5x − 10 = 25</span></a>
+        <a href="#tutor" data-eq="4,7,31"><span><strong>Comprobar tu respuesta</strong><br><span class="why">Para no perder puntos en el examen</span></span><span class="hand" style="font-size:22px">4x + 7 = 31</span></a>
+      </div>
+      <p class="muted" style="font-size:14.5px;margin-top:16px" id="parentNote"></p>
+    </div>
+  </div>
+</section>
+
+<!-- TUTOR -->
+<section class="view" id="v-tutor">
+  <h2>Tutor</h2>
+  <div class="tutor">
+    <div class="sheet work" id="work" aria-live="polite"></div>
+    <div class="panel">
+      <div class="chat" id="chat" aria-live="polite"></div>
+      <div class="chips" id="chips"></div>
+    </div>
+  </div>
+</section>
+
+<!-- LOGRO -->
+<section class="view" id="v-logro">
+  <div class="reward">
+    <div class="big">¡Lo resolviste tú!</div>
+    <p class="lead" style="margin:0 auto" id="rText"></p>
+    <ol class="rules">
+      <li>Para quitar un número que suma o resta, haz la operación contraria en los dos lados.</li>
+      <li>Para quitar un número que multiplica a la x, divide los dos lados entre ese número.</li>
+      <li>Comprueba sustituyendo la x en la ecuación original.</li>
+    </ol>
+    <div class="row" style="justify-content:center">
+      <button class="btn primary" id="similarBtn">Practicar uno similar</button>
+      <a class="btn" href="#panel">Volver a mi panel</a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">Pizarra es un prototipo de comercio electrónico para la clase ISO923. Proyecto de Jerlyn Rodríguez.</div>
+</footer>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+const PLANS = [
+  {id:'gratis', name:'Gratis', tag:'Para probar', m:0, a:0,
+   feats:['3 ejercicios al día','Evaluación de tu nivel','Solo Álgebra básica']},
+  {id:'estudiante', name:'Estudiante', tag:'El más elegido', m:399, a:3990, featured:true,
+   feats:['Ejercicios ilimitados','Escaneo con la cámara','Botón “Explícalo diferente”','Álgebra, Geometría y Cálculo']},
+  {id:'familia', name:'Familia', tag:'Hasta 3 hijos', m:799, a:7990,
+   feats:['Todo lo del plan Estudiante','Hasta 3 perfiles','Reporte semanal al correo de los padres']},
+  {id:'colegios', name:'Colegios', tag:'Para instituciones', m:null, a:null,
+   feats:['Licencias por aula','Panel para profesores','Integración con la plataforma del colegio']}
+];
+const ADDONS = [
+  {id:'examen', sym:'⏱', name:'Modo examen', desc:'Pruebas con tiempo límite y sin ayudas, para practicar antes del examen real.', price:149},
+  {id:'calculo', sym:'∫', name:'Paquete Cálculo I', desc:'Límites y derivadas con explicaciones paso a paso.', price:249},
+  {id:'humano', sym:'☺', name:'Sesión con tutor humano', desc:'30 minutos por videollamada con un profesor de matemáticas.', price:350}
+];
+const COUPONS = {PRIMERCICLO:0.20, PIZARRA10:0.10};
+const ITBIS = 0.18;
+
+const state = {plan:null, period:'mensual', addons:new Set(), coupon:null, name:'', owned:null, eq:[2,5,13]};
+
+const $ = s => document.querySelector(s);
+const fmt = n => 'RD$' + n.toLocaleString('es-DO',{minimumFractionDigits:0, maximumFractionDigits:2});
+function toast(t){const el=$('#toast');el.textContent=t;el.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove('show'),2400)}
+
+/* ---------- Catálogo ---------- */
+function planPrice(p){return state.period==='anual'?p.a:p.m}
+function renderPlans(){
+  $('#plans').innerHTML = PLANS.map(p=>{
+    let price, btn;
+    if(p.m===null){price='<div class="price">A medida</div>'; btn=`<button class="btn" data-quote>Pedir cotización</button>`}
+    else if(p.m===0){price='<div class="price">RD$0</div>'; btn=`<button class="btn" data-free>Empezar gratis</button>`}
+    else{
+      price=`<div class="price">${fmt(planPrice(p))}<small> / ${state.period==='anual'?'año':'mes'}</small></div>`;
+      const inCart = state.plan===p.id;
+      btn=`<button class="btn ${p.featured?'primary':''}" data-plan="${p.id}">${inCart?'En tu carrito':'Agregar al carrito'}</button>`;
+    }
+    return `<article class="plan ${p.featured?'featured':''}">
+      <div class="tag">${p.tag}</div><h3>${p.name}</h3>${price}
+      <ul>${p.feats.map(f=>`<li>${f}</li>`).join('')}</ul>${btn}</article>`;
+  }).join('');
+  $('#addons').innerHTML = ADDONS.map(a=>{
+    const inCart=state.addons.has(a.id);
+    return `<div class="addon"><div class="sym">${a.sym}</div><div>
+      <h3>${a.name}</h3><p class="muted">${a.desc}</p>
+      <div class="row"><strong>${fmt(a.price)}</strong>
+      <button class="btn small" data-addon="${a.id}">${inCart?'Quitar':'Agregar'}</button></div></div></div>`;
+  }).join('');
+}
+document.addEventListener('click',e=>{
+  const t=e.target.closest('button,a'); if(!t) return;
+  if(t.dataset.period){
+    state.period=t.dataset.period;
+    document.querySelectorAll('[data-period]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.period===state.period));
+    renderPlans(); updateCount();
+  }
+  if(t.dataset.plan){
+    const replacing = state.plan && state.plan!==t.dataset.plan;
+    state.plan=t.dataset.plan; renderPlans(); updateCount();
+    toast(replacing?'Cambiaste de plan en tu carrito':'Plan agregado al carrito');
+  }
+  if(t.dataset.addon){
+    const id=t.dataset.addon;
+    if(state.addons.has(id)){state.addons.delete(id);toast('Complemento quitado')}
+    else{state.addons.add(id);toast(state.plan?'Complemento agregado':'Complemento agregado. Elige también un plan.')}
+    renderPlans(); updateCount();
+  }
+  if(t.hasAttribute('data-free')){state.owned='gratis';toast('Listo, ya tienes el plan Gratis');location.hash='panel'}
+  if(t.hasAttribute('data-quote')){toast('Gracias. Te escribiremos en menos de 24 horas.')}
+  if(t.dataset.remove){
+    if(t.dataset.remove==='plan') state.plan=null; else state.addons.delete(t.dataset.remove);
+    renderCart(); renderPlans(); updateCount();
+  }
+  if(t.dataset.eq){state.eq=t.dataset.eq.split(',').map(Number)}
+  if(t.dataset.action==='demo'){state.eq=[2,5,13]}
+});
+
+/* ---------- Carrito ---------- */
+function cartLines(){
+  const lines=[];
+  if(state.plan){const p=PLANS.find(x=>x.id===state.plan);lines.push({key:'plan',name:`Plan ${p.name} (${state.period})`,price:planPrice(p)})}
+  state.addons.forEach(id=>{const a=ADDONS.find(x=>x.id===id);lines.push({key:id,name:a.name,price:a.price})});
+  return lines;
+}
+function totals(){
+  const sub=cartLines().reduce((s,l)=>s+l.price,0);
+  const disc=state.coupon?Math.round(sub*COUPONS[state.coupon]):0;
+  const tax=Math.round((sub-disc)*ITBIS);
+  return {sub,disc,tax,total:sub-disc+tax};
+}
+function updateCount(){$('#cartCount').textContent=cartLines().length}
+function summaryHTML(withActions){
+  const t=totals();
+  return `<h3>Resumen</h3>
+    <div class="sum-row"><span>Subtotal</span><span>${fmt(t.sub)}</span></div>
+    ${t.disc?`<div class="sum-row discount"><span>Cupón ${state.coupon}</span><span>−${fmt(t.disc)}</span></div>`:''}
+    <div class="sum-row"><span>ITBIS (18%)</span><span>${fmt(t.tax)}</span></div>
+    <div class="sum-row total"><span>Total</span><span>${fmt(t.total)}</span></div>
+    ${withActions?`
+    <form class="coupon" id="couponForm"><label class="sr" for="cpn">Cupón</label>
+      <input type="text" id="cpn" placeholder="Cupón de descuento" value="${state.coupon||''}">
+      <button class="btn small" type="submit">Aplicar</button></form>
+    <p class="err" id="cpnErr"></p>
+    <a class="btn primary" style="width:100%;margin-top:6px" href="#pago" id="toPay" ${state.plan?'':'aria-disabled="true"'}>Continuar al pago</a>
+    ${state.plan?'':'<p class="muted" style="font-size:14.5px;margin-top:8px">Agrega un plan para poder continuar.</p>'}`:''}`;
+}
+function renderCart(){
+  const lines=cartLines();
+  if(!lines.length){
+    $('#cartItems').innerHTML=`<div class="empty"><span class="hand">Tu carrito está vacío</span><p class="muted" style="margin:0 auto 14px">Elige un plan para empezar a practicar.</p><a class="btn primary" href="#planes">Ver planes</a></div>`;
+  } else {
+    $('#cartItems').innerHTML=lines.map(l=>`<div class="item"><div><strong>${l.name}</strong><br><button class="x" data-remove="${l.key}">Quitar</button></div><div>${fmt(l.price)}</div></div>`).join('');
+  }
+  $('#cartSummary').innerHTML=summaryHTML(true);
+  $('#couponForm').addEventListener('submit',e=>{
+    e.preventDefault();
+    const code=$('#cpn').value.trim().toUpperCase();
+    if(!code){state.coupon=null;renderCart();return}
+    if(COUPONS[code]){state.coupon=code;renderCart();toast(`Cupón aplicado: ${COUPONS[code]*100}% de descuento`)}
+    else $('#cpnErr').textContent='Ese cupón no existe. Prueba con PRIMERCICLO.';
+  });
+  const tp=$('#toPay'); if(tp && !state.plan) tp.addEventListener('click',e=>e.preventDefault());
+}
+
+/* ---------- Pago ---------- */
+function renderPay(){
+  $('#paySummary').innerHTML = cartLines().map(l=>`<div class="sum-row"><span>${l.name}</span><span>${fmt(l.price)}</span></div>`).join('') + '<hr style="border:0;border-top:1px solid var(--line)">' + summaryHTML(false);
+  $('#payBtn').textContent=`Pagar ${fmt(totals().total)}`;
+}
+document.querySelectorAll('input[name=method]').forEach(r=>r.addEventListener('change',()=>{
+  $('#cardFields').style.display = document.querySelector('input[name=method]:checked').value==='tarjeta'?'block':'none';
+}));
+$('#payForm').addEventListener('submit',e=>{
+  e.preventDefault();
+  const name=$('#fName').value.trim(), email=$('#fEmail').value.trim();
+  const method=document.querySelector('input[name=method]:checked').value;
+  const err=$('#payErr');
+  if(!name) return err.textContent='Escribe tu nombre completo.';
+  if(!/^\S+@\S+\.\S+$/.test(email)) return err.textContent='Escribe un correo válido, por ejemplo ana@correo.com.';
+  if(method==='tarjeta'){
+    const num=$('#fCard').value.replace(/\s/g,'');
+    if(num.length<15) return err.textContent='El número de tarjeta está incompleto. En este prototipo usa 4242 4242 4242 4242.';
+    if(!/^\d{2}\/\d{2}$/.test($('#fExp').value.trim())) return err.textContent='Escribe la fecha de vencimiento como MM/AA.';
+    if(!/^\d{3,4}$/.test($('#fCvc').value.trim())) return err.textContent='El CVC tiene 3 o 4 números.';
+  }
+  err.textContent='';
+  const btn=$('#payBtn'); btn.disabled=true; btn.textContent='Procesando pago…';
+  setTimeout(()=>{
+    const order='PZ-'+new Date().getFullYear()+'-'+Math.floor(1000+Math.random()*9000);
+    const p=PLANS.find(x=>x.id===state.plan);
+    const lines=cartLines(), t=totals();
+    state.name=name.split(' ')[0]; state.owned=state.plan;
+    const mText={tarjeta:'tu tarjeta',paypal:'PayPal',transferencia:'transferencia bancaria'}[method];
+    $('#cTitle').textContent=`Gracias, ${state.name}`;
+    $('#cText').innerHTML=`Tu pedido <strong>${order}</strong> fue confirmado y pagado con ${mText}. Enviamos el recibo a <strong>${email}</strong>. Tu plan ${p.name} ya está activo.`;
+    $('#cItems').innerHTML=lines.map(l=>`<div class="sum-row"><span>${l.name}</span><span>${fmt(l.price)}</span></div>`).join('')+(t.disc?`<div class="sum-row discount"><span>Cupón ${state.coupon}</span><span>−${fmt(t.disc)}</span></div>`:'')+`<div class="sum-row"><span>ITBIS (18%)</span><span>${fmt(t.tax)}</span></div><div class="sum-row total"><span>Total pagado</span><span>${fmt(t.total)}</span></div>`;
+    state.plan=null; state.addons.clear(); state.coupon=null; updateCount(); renderPlans();
+    $('#payForm').reset(); $('#cardFields').style.display='block'; btn.disabled=false;
+    location.hash='confirmacion';
+  },1300);
+});
+
+/* ---------- Panel ---------- */
+function ring(label,pct){
+  const r=34,c=2*Math.PI*r;
+  return `<div class="ring"><svg width="90" height="90" viewBox="0 0 90 90" role="img" aria-label="${label}: ${pct}%">
+    <circle cx="45" cy="45" r="${r}" fill="none" stroke="var(--grid)" stroke-width="10"/>
+    <circle cx="45" cy="45" r="${r}" fill="none" stroke="var(--ink)" stroke-width="10" stroke-linecap="round"
+      stroke-dasharray="${c*pct/100} ${c}" transform="rotate(-90 45 45)"/>
+    <text x="45" y="51" text-anchor="middle" font-size="18" font-weight="700" fill="var(--ink)" font-family="Atkinson Hyperlegible, sans-serif">${pct}%</text>
+  </svg>${label}</div>`;
+}
+function renderPanel(){
+  $('#hello').textContent = `¡Hola${state.name?', '+state.name:''}! ¿Qué concepto dominaremos hoy?`;
+  const p=PLANS.find(x=>x.id===state.owned);
+  $('#planLine').textContent = p?`Tu plan: ${p.name}.`:'Estás usando la demostración gratuita.';
+  $('#rings').innerHTML = ring('Álgebra',72)+ring('Geometría',45)+ring('Cálculo',18);
+  $('#parentNote').textContent = state.owned==='familia'?'El reporte semanal se enviará al correo de los padres cada domingo.':'';
+}
+function parseEq(s){
+  const m=s.replace(/\s/g,'').replace(/−/g,'-').match(/^(-?\d*)x([+-]\d+)=(-?\d+)$/i);
+  if(!m) return null;
+  const a=m[1]===''?1:m[1]==='-'?-1:+m[1], b=+m[2], c=+m[3];
+  if(a===0) return null;
+  return [a,b,c];
+}
+$('#askForm').addEventListener('submit',e=>{
+  e.preventDefault();
+  const eq=parseEq($('#askInput').value);
+  if(!eq){$('#askErr').textContent='Escribe la ecuación como ax + b = c, por ejemplo 3x + 4 = 19.';return}
+  $('#askErr').textContent=''; state.eq=eq; location.hash='tutor';
+});
+$('#camBtn').addEventListener('click',()=>{
+  toast('Escaneo simulado: detectamos 3x + 4 = 19');
+  state.eq=[3,4,19]; setTimeout(()=>location.hash='tutor',900);
+});
+
+/* ---------- Tutor ---------- */
+const sgn = n => n<0?`− ${Math.abs(n)}`:`+ ${n}`;
+const xTerm = a => a===1?'x':a===-1?'−x':`${a}x`;
+const num = n => n<0?`−${Math.abs(n)}`:`${n}`;
+let step=0;
+function addLine(text,cls=''){const d=document.createElement('div');d.className='line '+cls;d.innerHTML=text;$('#work').appendChild(d)}
+function addNote(text){const d=document.createElement('p');d.className='note';d.textContent=text;$('#work').appendChild(d)}
+function say(text,who='ai',extra=''){
+  const d=document.createElement('div');d.className=`msg ${who} ${extra}`;d.innerHTML=text;$('#chat').appendChild(d);
+  $('#chat').scrollTop=$('#chat').scrollHeight;
+}
+function chips(list){
+  $('#chips').innerHTML='';
+  list.forEach(([label,fn,alt])=>{const b=document.createElement('button');b.className='chip'+(alt?' alt':'');b.textContent=label;b.onclick=()=>{if(!alt)say(label,'me');fn()};$('#chips').appendChild(b)});
+}
+function shuffle(a){return a.map(v=>[Math.random(),v]).sort((x,y)=>x[0]-y[0]).map(v=>v[1])}
+function startTutor(){
+  const [a,b,c]=state.eq; step=0;
+  $('#work').innerHTML=''; $('#chat').innerHTML='';
+  addLine(`${xTerm(a)} ${sgn(b)} = ${num(c)}`);
+  say(`Vamos a resolver <strong>${xTerm(a)} ${sgn(b)} = ${num(c)}</strong>. Queremos dejar la x sola. ¿Qué hacemos primero con el <strong>${sgn(b).replace(' ','')}</strong>?`);
+  stepOne();
+}
+function explainDifferent(){
+  const [a,b,c]=state.eq;
+  if(step===0){
+    say(b>0
+      ?`Piénsalo con dinero: tienes ${a} sobres con la misma cantidad de pesos dentro y ${b} pesos sueltos. En total tienes ${c} pesos. Si apartas los ${b} pesos sueltos, ¿cuánto queda en los sobres?`
+      :`Piénsalo con dinero: tienes ${a} sobres con la misma cantidad de pesos, pero debes ${Math.abs(b)} pesos. Después de pagar te quedan ${c}. Antes de pagar, ¿cuánto había en los sobres?`,'ai','hint');
+  } else {
+    say(`Ahora tienes ${a} sobres iguales con ${(c-b)} pesos en total. Para saber cuánto hay en un solo sobre, reparte en partes iguales: ¿entre cuántos divides?`,'ai','hint');
+  }
+}
+function stepOne(){
+  const [a,b,c]=state.eq;
+  const right = b>0?`Restar ${b} en los dos lados`:`Sumar ${Math.abs(b)} en los dos lados`;
+  const wrong1 = `Dividir entre ${a}`;
+  const wrong2 = b>0?`Sumar ${b} en los dos lados`:`Restar ${Math.abs(b)} en los dos lados`;
+  chips([...shuffle([
+    [right,()=>{
+      addNote(b>0?`Resto ${b} en los dos lados`:`Sumo ${Math.abs(b)} en los dos lados`);
+      addLine(`${xTerm(a)} = ${num(c)} ${b>0?'−':'+'} ${Math.abs(b)}`);
+      addLine(`${xTerm(a)} = ${num(c-b)}`);
+      step=1;
+      say(`Exacto. Nos queda <strong>${xTerm(a)} = ${num(c-b)}</strong>. Ahora, ¿qué hacemos con el ${a} que multiplica a la x?`);
+      stepTwo();
+    }],
+    [wrong1,()=>say(`Se puede, pero se complica: tendrías que dividir también el ${Math.abs(b)}. Mejor primero quita el número que ${b>0?'suma':'resta'}. ¿Cuál es la operación contraria?`,'ai','hint')],
+    [wrong2,()=>say(`Ojo con el signo. Si ${b>0?'sumas':'restas'}, el ${Math.abs(b)} no desaparece, se duplica. Usa la operación contraria.`,'ai','hint')]
+  ]),['Explícalo diferente',explainDifferent,true]]);
+}
+function stepTwo(){
+  const [a,b,c]=state.eq, x=(c-b)/a;
+  chips([...shuffle([
+    [`Dividir entre ${a} en los dos lados`,()=>{
+      addNote(`Divido entre ${a}`);
+      addLine(`<span class="final">x = ${num(x)}</span>`);
+      addLine(`<span class="ok">${a}(${num(x)}) ${sgn(b)} = ${num(c)} ✓</span>`);
+      say(`¡Muy bien! <strong>x = ${num(x)}</strong>. Comprobamos: ${a} × ${num(x)} ${sgn(b)} = ${num(c)}. Sí cumple.`);
+      chips([['Ver mi resumen',()=>{$('#rText').textContent=`Resolviste ${xTerm(a)} ${sgn(b)} = ${num(c)} en dos pasos y comprobaste tu respuesta.`;location.hash='logro'},false]]);
+    }],
+    [`Restar ${a} en los dos lados`,()=>say(`El ${a} no está sumando, está multiplicando a la x. ¿Cuál es la operación contraria a multiplicar?`,'ai','hint')],
+    [`Multiplicar por ${a}`,()=>say(`Si multiplicas, la x queda más lejos: tendrías ${a*a}x. Prueba con la operación contraria.`,'ai','hint')]
+  ]),['Explícalo diferente',explainDifferent,true]]);
+}
+$('#similarBtn').addEventListener('click',()=>{
+  const a=2+Math.floor(Math.random()*7), x=1+Math.floor(Math.random()*9);
+  let b=1+Math.floor(Math.random()*12); if(Math.random()<.35) b=-b;
+  state.eq=[a,b,a*x+b]; location.hash='tutor';
+  toast('Nuevo ejercicio con la misma estructura');
+});
+
+/* ---------- Rutas ---------- */
+const VIEWS=['inicio','planes','carrito','pago','confirmacion','panel','tutor','logro'];
+function route(){
+  let v=location.hash.replace('#','')||'inicio';
+  if(!VIEWS.includes(v)) v='inicio';
+  if(v==='pago' && !state.plan){v='carrito'; history.replaceState(null,'','#carrito')}
+  document.querySelectorAll('.view').forEach(s=>s.classList.toggle('active',s.id==='v-'+v));
+  document.querySelectorAll('[data-nav]').forEach(a=>a.toggleAttribute('aria-current',false));
+  const cur=document.querySelector(`[data-nav="${v}"]`); if(cur) cur.setAttribute('aria-current','page');
+  if(v==='planes') renderPlans();
+  if(v==='carrito') renderCart();
+  if(v==='pago') renderPay();
+  if(v==='panel') renderPanel();
+  if(v==='tutor') startTutor();
+  window.scrollTo(0,0);
+}
+window.addEventListener('hashchange',route);
+renderPlans(); updateCount(); route();
+</script>
+</body>
+</html>
